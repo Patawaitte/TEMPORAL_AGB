@@ -1,0 +1,43 @@
+import geopandas as gpd
+import pandas as pd
+
+file= '/home/beland/PycharmProjects/gdb/Placettes/PET4_GPKG/PET4.gpkg'
+
+placette = gpd.read_file(file, layer='placette')
+dendro_gaules = gpd.read_file(file, layer='dendro_gaules')
+dendro_arbres = gpd.read_file(file, layer='dendro_arbres')
+pee_ori_sond = gpd.read_file(file, layer='pee_ori_sond')
+
+allometric = pd.read_csv("/home/beland/PycharmProjects/Data_biomass/allometrique_biomass_indice_.csv")
+#print(placette.head())
+print(dendro_gaules.head())
+print(dendro_arbres.head())
+print(pee_ori_sond.head())
+
+dendro_arbres = dendro_arbres[dendro_arbres['dhp'].notna()]
+
+#placette_arbre = pd.merge(placette_mes[["id_pe", "date_sond", "id_pe_mes"]], dendro_arbres, on="id_pe_mes", how='left')
+#placette_gaules = pd.merge(placette_mes[["id_pe", "date_sond", "id_pe_mes"]], dendro_gaules, on="id_pe_mes", how='left')
+dendro_gaules = dendro_gaules[dendro_gaules['cl_dhp'].notna()]
+
+dendro_arbres['dhp_cm']= dendro_arbres['dhp'].astype(float)*0.1
+dendro_gaules['dhp_cm']= dendro_gaules['cl_dhp'].astype(int)
+
+placette_alltiges =pd.concat([dendro_arbres,dendro_gaules], axis=0, ignore_index=True)
+placette_alltiges['dhp_paire']=round(placette_alltiges['dhp_cm']/2)*2
+
+tige_biomass_temp = pd.merge(placette_alltiges, allometric, left_on="essence", right_on='code_ess', how='left')
+
+tige_biomass_temp['bio_compo_ha']= (tige_biomass_temp['a']*(tige_biomass_temp['dhp_cm']**tige_biomass_temp['b']))*tige_biomass_temp['tige_ha']
+
+placette_biomass= tige_biomass_temp.groupby(by=["id_pe"], as_index=False).sum()
+placette_biomass= placette_biomass[["id_pe", "bio_compo_ha"]]
+placette_biomass['bio_compo_Mg']= placette_biomass["bio_compo_ha"]/1000
+
+placette_biomass_info = pd.merge(placette_biomass, pee_ori_sond[["id_pe","perturb", "an_perturb", "type_couv", "cl_dens","cl_haut", "cl_age"]], on="id_pe", how='left')
+
+placette_biomass_info_geom = pd.merge(placette[["id_pe","feuillet", "latitude", "longitude", "date_sond",  "geometry"]], placette_biomass_info, on="id_pe", how='left')
+
+#test=placette_biomass_info[placette_biomass_info['id_pe_mes'] == '920340840203']
+
+placette_biomass_info_geom.to_file("/home/beland/PycharmProjects/Data_biomass/Biomass_Placette/PET4.shp", driver='ESRI Shapefile')
