@@ -12,42 +12,49 @@ import glob
 import geopandas as gpd
 import pandas as pd
 #Path to Laz and output
-chemin = "C:/Lidar/"
-laz_filepath = chemin +"LAZ_synchron/"
-outputclip = chemin +"clip_synchro/"
 
-#Getting the sample area bounding box from shapefile points
-r = 11.28
-df = gpd.read_file("C:/Lidar/shp/Placette_synchrone_1an_lazname.shp")
+for crs in range(2946, 2952+1):
+    chemin = "C:/Lidar/"
+    laz_filepath = chemin +"LAZ_synchron/"
+    outputclip = chemin +"clip_synchro/"
+    ground =  chemin +"LAZ_synchron_ground/"
 
-df.crs = {'init' : 'epsg:6622'}
-df=df.to_crs('epsg:2948')
-df['x']  = df.geometry.x
-df['y']  = df.geometry.y
-print(df['x'])
-df['Xmin'] = (df.geometry.x)-r
-df['Ymin'] = (df.geometry.y)-r
-df['Xmax'] = (df.geometry.x)+r
-df['Ymax'] = (df.geometry.y)+r
+    #Getting the sample area bounding box from shapefile points
+    r = 11.28
+    df = gpd.read_file("C:/Lidar/shp/Placette_synchrone_1an_lazname.shp")
 
-df['coordplot'] = df[['Xmin', 'Ymin', 'Xmax', 'Ymax']].apply(lambda row: ' '.join(row.values.astype(str)), axis=1)
+    df.crs = {'init' : 'epsg:6622'}
+    df=df.to_crs('epsg:'+str(crs))
+    df['x']  = df.geometry.x
+    df['y']  = df.geometry.y
+    print(df['x'])
+    df['Xmin'] = (df.geometry.x)-r
+    df['Ymin'] = (df.geometry.y)-r
+    df['Xmax'] = (df.geometry.x)+r
+    df['Ymax'] = (df.geometry.y)+r
 
-#Iterate over the shapefile
-df = df.reset_index()
-print(df.head())
-for index, row in df.iterrows():
-    print(row['idmes']) 
-    #namelaz=(row['filenam'].split("/"))[3] #Get the name of the intersept laz data
-    namelaz=(row['laz_name']+'_dc.laz')
-    print(laz_filepath+namelaz)
+    df['coordplot'] = df[['Xmin', 'Ymin', 'Xmax', 'Ymax']].apply(lambda row: ' '.join(row.values.astype(str)), axis=1)
 
-    clip =  "C:/Lidar/FUSION/clipdata.exe /shape:1 "+laz_filepath+namelaz+ " "+outputclip+"clip_"+namelaz+ " "+row['coordplot']
-    #clip =  "C:/Lidar/FUSION/polyclipdata.exe C:/Lidar/shp/Points_1sample_buff.shp C:/Lidar/stand.las C:/Lidar/sample/tile_248000_5252750.laz"
+    #Iterate over the shapefile
+    df = df.reset_index()
+    print(df.head())
+    for index, row in df.iterrows():
+        print(row['idmes'])
+        #namelaz=(row['filenam'].split("/"))[3] #Get the name of the intersept laz data
+        namelaz=(row['laz_name']+'_dc.laz')
+        print(laz_filepath+namelaz)
+        nameclip=(str(row['idmes'])+'.laz')
+        print('nameclip',nameclip)
 
-    sp.call(clip)
+        clip =  "C:/Lidar/FUSION/clipdata.exe /shape:1 /height /dtm:" + ground + namelaz[:-4] + "_Ground_surface.dtm "+laz_filepath+namelaz+ " "+outputclip+"clip_"+nameclip+ " "+row['coordplot']
+        #clip =  "C:/Lidar/FUSION/polyclipdata.exe C:/Lidar/shp/Points_1sample_buff.shp C:/Lidar/stand.las C:/Lidar/sample/tile_248000_5252750.laz"
 
-cloudmetric = "C:/Lidar/FUSION/CloudMetrics.exe /new /id /above:2 /minht:2 /firstreturn "+outputclip+"*.laz"+" "+chemin+"samplemetrics_firstreturn_zone6.csv"
-sp.call(cloudmetric)
+        sp.call(clip)
+        print('pathclip',  chemin + outputclip+"clip_"+nameclip+ ".laz")
 
-print('done')
+
+    cloudmetric = "C:/Lidar/FUSION/CloudMetrics.exe /new /id  /above:2 /minht:2  "+outputclip+"*.laz"+" "+chemin+"samplemetrics_allreturn_noint.csv"
+    sp.call(cloudmetric)
+
+    print('done')
 
